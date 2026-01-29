@@ -13,13 +13,21 @@
 LOG_MODULE_DECLARE(zmk, CONFIG_ZMK_LOG_LEVEL);
 
 static void asdc_rx_callback(const struct device *dev, uint8_t *data, size_t len) {
-    // this is just a sample, print the data received
     LOG_INF("ASDC data received on device %s: len=%d", dev->name, len);
-    // print data as string
-    char buf[256];
-    size_t print_len = len < sizeof(buf) ? len : sizeof(buf);
-    memcpy(buf, data, print_len);
-    LOG_INF("Data: %s", buf);
+    
+    // Print data as string in chunks
+    char buf[128];
+    size_t offset = 0;
+    int chunk = 0;
+    
+    while (offset < len) {
+        size_t chunk_len = MIN(len - offset, sizeof(buf) - 1);
+        memcpy(buf, data + offset, chunk_len);
+        buf[chunk_len] = '\0';
+        LOG_INF("Data[%d]: %s", chunk, buf);
+        offset += chunk_len;
+        chunk++;
+    }
 }
 
 static void send_asdc_message(const struct device *asdc_dev, uint8_t* data, size_t length)

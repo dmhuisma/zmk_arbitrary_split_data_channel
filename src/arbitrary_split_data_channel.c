@@ -64,37 +64,6 @@ static int asdc_init(const struct device *dev)
     return asdc_transport_init(dev);
 }
 
-#ifdef CONFIG_ZMK_SPLIT_BLE
-// TODO - remove BLE specific code from this file
-void asdc_store_connection(struct bt_conn *conn)
-{
-    #define ASDC_STORE_CONN(n)                                                      \
-        do {                                                                        \
-            const struct device *dev = DEVICE_DT_INST_GET(n);                       \
-            if (dev && device_is_ready(dev)) {                                      \
-                struct asdc_data *data = (struct asdc_data *)dev->data;             \
-                data->conn = conn;                                                  \
-            }                                                                       \
-        } while (0);
-    DT_INST_FOREACH_STATUS_OKAY(ASDC_STORE_CONN)
-}
-
-void asdc_clear_connection(struct bt_conn *conn)
-{
-    #define ASDC_CLEAR_CONN(n)                                                      \
-        do {                                                                        \
-            const struct device *dev = DEVICE_DT_INST_GET(n);                       \
-            if (dev && device_is_ready(dev)) {                                      \
-                struct asdc_data *data = (struct asdc_data *)dev->data;             \
-                if (conn == NULL || data->conn == conn) {                           \
-                    data->conn = NULL;                                              \
-                }                                                                   \
-            }                                                                       \
-        } while (0);
-    DT_INST_FOREACH_STATUS_OKAY(ASDC_CLEAR_CONN)
-}
-#endif
-
 K_WORK_DEFINE(asdc_tx_work, asdc_tx_work_callback);
 K_WORK_DEFINE(asdc_rx_work, asdc_rx_work_callback);
 
@@ -201,12 +170,10 @@ static const struct asdc_driver_api asdc_api = {
 // Define config structs for each instance
 //
 
-#ifdef CONFIG_ZMK_SPLIT_BLE
 #define ASDC_CFG_DEFINE(n)                                                      \
     static const struct asdc_config config_##n = {                              \
         .channel_id = DT_INST_PROP(n, channel_id),                              \
     };
-#endif
 
 DT_INST_FOREACH_STATUS_OKAY(ASDC_CFG_DEFINE)
 

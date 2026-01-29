@@ -18,7 +18,6 @@ typedef void (*asdc_register_rx_cb)(const struct device *dev, asdc_rx_cb cb);
 // device runtime data structure
 struct asdc_data {
     asdc_rx_cb recv_cb;
-    struct bt_conn *conn;
 };
 
 struct asdc_packet {
@@ -55,11 +54,6 @@ static inline void z_impl_asdc_register_recv_cb(const struct device *dev, asdc_r
 }
 
 void asdc_on_data_received(uint8_t *data, size_t len);
-
-#ifdef CONFIG_ZMK_SPLIT_BLE
-void asdc_store_connection(struct bt_conn *conn);
-void asdc_clear_connection(struct bt_conn *conn);
-#endif
 
 #include <syscalls/arbitrary_split_data_channel.h>
 

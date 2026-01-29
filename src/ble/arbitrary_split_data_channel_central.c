@@ -19,23 +19,6 @@ static struct asdc_peripheral_slot peripheral_slots[CONFIG_ZMK_SPLIT_BLE_CENTRAL
 
 NET_BUF_POOL_FIXED_DEFINE(asdc_central_tx_pool, 5, BT_L2CAP_SDU_BUF_SIZE(CONFIG_BT_L2CAP_TX_MTU), 8, NULL);
 
-static int asdc_peripheral_slot_index_for_conn(struct bt_conn *conn) {
-    for (int i = 0; i < CONFIG_ZMK_SPLIT_BLE_CENTRAL_PERIPHERALS; i++) {
-        if (peripheral_slots[i].conn == conn) {
-            return i;
-        }
-    }
-    return -EINVAL;
-}
-
-static struct asdc_peripheral_slot *asdc_peripheral_slot_for_conn(struct bt_conn *conn) {
-    int idx = asdc_peripheral_slot_index_for_conn(conn);
-    if (idx < 0) {
-        return NULL;
-    }
-    return &peripheral_slots[idx];
-}
-
 static int asdc_l2cap_recv(struct bt_l2cap_chan *chan, struct net_buf *buf) {    
     if (buf->len > 0) {
         asdc_on_data_received(buf->data, buf->len);
@@ -97,9 +80,6 @@ static void on_connected(struct bt_conn *conn, uint8_t err)
             return;
         }
     }
-
-    // Store connection in all ASDC device instances
-    asdc_store_connection(conn);
     
     // Connect L2CAP channel
     struct bt_l2cap_le_chan *le_chan = &peripheral_slots[i].chan;
@@ -124,9 +104,6 @@ static void on_disconnected(struct bt_conn *conn, uint8_t reason)
             break;
         }
     }
-
-    // Clear connection from all ASDC device instances
-    asdc_clear_connection(conn);
 }
 
 BT_CONN_CB_DEFINE(conn_callbacks) = {
@@ -147,56 +124,58 @@ int asdc_transport_init(const struct device *dev) {
     return 0;
 }
 
-void asdc_transport_send_data(const struct device *dev, const uint8_t *data, size_t length) {
-    struct asdc_data *asdc_data = (struct asdc_data *)dev->data;
-    struct bt_conn* conn = asdc_data->conn;
-    if (!conn) {
-        LOG_ERR("No active connection for ASDC data send");
-        return;
-    }
-
-    // TODO - I think this needs to send for every peripheral slot?
-
-    struct asdc_peripheral_slot *slot = asdc_peripheral_slot_for_conn(conn);
-    if (!slot) {
-        LOG_ERR("No peripheral slot found for connection");
-        return;
-    }
-
-    if (!slot->chan.chan.conn) {
-        LOG_ERR("No active L2CAP channel for ASDC data send");
-        return;
-    }
-
+void asdc_transport_send_data(const struct device *dev, const uint8_t *data, size_t length) {  
+    
     if (length > CONFIG_BT_L2CAP_TX_MTU) {
         LOG_ERR("Length %zu exceeds configured MTU %d", length, CONFIG_BT_L2CAP_TX_MTU);
         return;
     }
-    
-    if (length > slot->chan.tx.mtu) {
-        LOG_ERR("Length %zu exceeds negotiated TX MTU %d", length, slot->chan.tx.mtu);
-        return;
-    }
 
-    struct net_buf *buf = net_buf_alloc(&asdc_central_tx_pool, K_SECONDS(2));
-    if (!buf) {
-        LOG_ERR("Failed to allocate net_buf for L2CAP send");
-        return;
-    }
+    // send the data for every peripheral connected to the central
+    for (uint8_t i = 0; i < CONFIG_ZMK_SPLIT_BLE_CENTRAL_PERIPHERALS; i++) {
+        struct asdc_peripheral_slot *slot = &peripheral_slots[i];
+        
+        if (!slot->conn) {
+            // no peripheral connected in this slot
+            continue;
+        }
 
-    net_buf_reserve(buf, BT_L2CAP_SDU_CHAN_SEND_RESERVE);
-    
-    if (length > net_buf_tailroom(buf)) {
-        LOG_ERR("Data too large for buffer (%zu > %d)", length, net_buf_tailroom(buf));
-        net_buf_unref(buf);
-        return;
-    }
-    
-    net_buf_add_mem(buf, data, length);
+        if (!slot->chan.chan.conn) {
+            LOG_ERR("No active L2CAP channel for ASDC data send");
+            continue;
+        }
 
-    int err = bt_l2cap_chan_send(&slot->chan.chan, buf);
-    if (err < 0) {
-        LOG_ERR("Failed to send L2CAP data (err %d)", err);
-        net_buf_unref(buf);
+        if (length > slot->chan.tx.mtu) {
+            LOG_ERR("Length %zu exceeds negotiated TX MTU %d", length, slot->chan.tx.mtu);
+            return;
+        }
+
+        // delay in between sending to multiple peripherals
+        // to avoid overwhelming the BLE stack
+        if (i > 0) {
+            k_msleep(100);
+        }
+
+        struct net_buf *buf = net_buf_alloc(&asdc_central_tx_pool, K_SECONDS(2));
+        if (!buf) {
+            LOG_ERR("Failed to allocate net_buf for L2CAP send");
+            return;
+        }
+
+        net_buf_reserve(buf, BT_L2CAP_SDU_CHAN_SEND_RESERVE);
+        
+        if (length > net_buf_tailroom(buf)) {
+            LOG_ERR("Data too large for buffer (%zu > %d)", length, net_buf_tailroom(buf));
+            net_buf_unref(buf);
+            return;
+        }
+        
+        net_buf_add_mem(buf, data, length);
+
+        int err = bt_l2cap_chan_send(&slot->chan.chan, buf);
+        if (err < 0) {
+            LOG_ERR("Failed to send L2CAP data (err %d)", err);
+            net_buf_unref(buf);
+        }
     }
 }

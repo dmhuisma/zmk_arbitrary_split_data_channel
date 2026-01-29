@@ -103,10 +103,8 @@ static int asdc_split_peripheral_status_listener(const zmk_event_t *eh) {
         char addr[BT_ADDR_LE_STR_LEN];
         bt_addr_le_to_str(bt_conn_get_dst(conn), addr, sizeof(addr));
         LOG_DBG("ASDC device connected: %s", addr);
-        asdc_store_connection(conn);
     } else {
         LOG_DBG("ASDC device disconnected");
-        asdc_clear_connection(NULL);
     }
 
     return ZMK_EV_EVENT_BUBBLE;
@@ -136,12 +134,6 @@ int asdc_transport_init(const struct device *dev) {
 }
 
 void asdc_transport_send_data(const struct device *dev, const uint8_t *data, size_t length) {
-    struct asdc_data *asdc_data = (struct asdc_data *)dev->data;
-    struct bt_conn* conn = asdc_data->conn;
-    if (!conn) {
-        LOG_ERR("No active connection for ASDC data send");
-        return;
-    }
     
     if (!asdc_l2cap_chan.chan.conn) {
         LOG_ERR("No active L2CAP channel for ASDC data send");
