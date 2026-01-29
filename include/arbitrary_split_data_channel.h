@@ -4,17 +4,20 @@
 
 #ifdef CONFIG_ZMK_SPLIT_BLE
 #include <zephyr/bluetooth/uuid.h>
-#define ZMK_BT_ASDC_UUID(num)           BT_UUID_128_ENCODE(num, 0x0096, 0x7107, 0xc967, 0xc5cfb1c2482c)
-#define ZMK_BT_ASDC_SERVICE_UUID        ZMK_BT_ASDC_UUID(0x0001234a)
-#define ZMK_BT_ASDC_CHAR_UUID           ZMK_BT_ASDC_UUID(0x0001234b)
+// L2CAP PSM (Protocol/Service Multiplexer) for ASDC
+// Using a dynamic PSM in the range 0x0080-0x00FF
+#define ZMK_BT_ASDC_L2CAP_PSM           0x0080
 #endif
+
+#include <zephyr/device.h>
+#include <zephyr/kernel.h>
 
 // device config structure
 struct asdc_config {
     int channel_id;
 };
 
-typedef int (*asdc_rx_cb)(const struct device *dev, uint8_t *buf, size_t buflen);
+typedef void (*asdc_rx_cb)(const struct device *dev, uint8_t *buf, size_t buflen);
 
 typedef int (*asdc_tx)(const struct device *dev, const uint8_t *data, size_t len);
 typedef void (*asdc_register_rx_cb)(const struct device *dev, asdc_rx_cb cb);
@@ -26,10 +29,10 @@ struct asdc_data {
 };
 
 struct asdc_packet {
-    int channel_id;
-    size_t len;
+    uint32_t channel_id;
+    uint32_t len;
     uint8_t data[];
-};
+} __packed;
 
 __subsystem struct asdc_driver_api {
     asdc_tx send;

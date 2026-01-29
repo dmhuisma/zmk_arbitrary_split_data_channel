@@ -12,14 +12,13 @@
 
 LOG_MODULE_DECLARE(zmk, CONFIG_ZMK_LOG_LEVEL);
 
-static void asdc_rx_callback(const struct device *dev, const uint8_t *data, size_t len) {
+static void asdc_rx_callback(const struct device *dev, uint8_t *data, size_t len) {
     // this is just a sample, print the data received
     LOG_INF("ASDC data received on device %s: len=%d", dev->name, len);
     // print data as string
-    char buf[128];
-    size_t print_len = len < sizeof(buf) - 1 ? len : sizeof(buf) - 1;
+    char buf[256];
+    size_t print_len = len < sizeof(buf) ? len : sizeof(buf);
     memcpy(buf, data, print_len);
-    buf[print_len] = '\0';
     LOG_INF("Data: %s", buf);
 }
 
@@ -40,10 +39,10 @@ static void hello_timer_handler(struct k_work *work)
     const struct asdc_consumer_config *config = (const struct asdc_consumer_config *)data->dev->config;
 
     // Send "hello" to all ASDC channels
-    uint8_t message[] = "hello";
+    uint8_t message[] = "Hello! This is an example of a large message more than the BLE MTU size.";
     for (size_t i = 0; i < config->num_channels; i++) {
         const struct device *asdc_dev = config->asdc_channels[i];
-        send_asdc_message(asdc_dev, message, sizeof(message) - 1);
+        send_asdc_message(asdc_dev, message, sizeof(message));
     }
 
     // Reschedule for next second
@@ -79,10 +78,6 @@ static int asdcc_init(const struct device *dev)
     return 0;
 }
 
-static const struct asdc_consumer_driver_api asdcc_api = {
-
-};
-
 //
 // Define config structs for each instance
 //
@@ -105,6 +100,6 @@ DT_INST_FOREACH_STATUS_OKAY(ASDCC_CFG_DEFINE)
     static struct asdc_consumer_data asdcc_data_##n;                            \
     DEVICE_DT_INST_DEFINE(n, asdcc_init, NULL, &asdcc_data_##n,                 \
                           &config_##n, POST_KERNEL,                             \
-                          CONFIG_KERNEL_INIT_PRIORITY_DEFAULT, &asdcc_api);
+                          CONFIG_KERNEL_INIT_PRIORITY_DEFAULT, NULL);
 
 DT_INST_FOREACH_STATUS_OKAY(ASDCC_DEVICE_DEFINE)

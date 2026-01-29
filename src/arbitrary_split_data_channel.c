@@ -67,6 +67,7 @@ static int asdc_init(const struct device *dev)
 }
 
 #ifdef CONFIG_ZMK_SPLIT_BLE
+// TODO - remove BLE specific code from this file
 void asdc_store_connection(struct bt_conn *conn)
 {
     #define ASDC_STORE_CONN(n)                                                      \
@@ -141,15 +142,26 @@ static int asdc_send_data(const struct device *dev, const uint8_t *data, size_t 
 
 void asdc_on_data_received(uint8_t *data, size_t len)
 {
+    LOG_DBG("asdc_on_data_received: received %zu bytes", len);
+    
     if (len < sizeof(struct asdc_packet)) {
-        LOG_ERR("Received data too small to contain asdc_packet header");
+        LOG_ERR("Received data too small to contain asdc_packet header (need %zu, got %zu)", 
+                sizeof(struct asdc_packet), len);
         return;
     }
 
     struct asdc_packet *packet = (struct asdc_packet *)data;
+    
+    LOG_DBG("Packet header: channel_id=%u, len=%u", packet->channel_id, packet->len);
+    LOG_DBG("Expected total size: %u + %zu + %zu = %u", 
+            packet->len, sizeof(packet->channel_id), sizeof(packet->len),
+            packet->len + sizeof(packet->channel_id) + sizeof(packet->len));
 
     if (packet->len + sizeof(packet->channel_id) + sizeof(packet->len) != len) {
-        LOG_ERR("Received asdc data length mismatch");
+        LOG_ERR("Received asdc data length mismatch, got %zu, expected %u",
+                len, packet->len + sizeof(packet->channel_id) + sizeof(packet->len));
+        // Dump first 16 bytes for debugging
+        LOG_HEXDUMP_ERR(data, MIN(len, 16), "Packet dump:");
         return;
     }
 

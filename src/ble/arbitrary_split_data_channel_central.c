@@ -1,6 +1,5 @@
 
-#include <zephyr/bluetooth/gatt.h>
-#include <zephyr/bluetooth/uuid.h>
+#include <zephyr/bluetooth/l2cap.h>
 #include <zephyr/bluetooth/conn.h>
 #include <zephyr/devicetree.h>
 #include <zephyr/device.h>
@@ -11,17 +10,17 @@
 
 LOG_MODULE_DECLARE(zmk, CONFIG_ZMK_LOG_LEVEL);
 
+#define CREDITS			10
+#define DATA_MTU		(23 * CREDITS)
+
 struct asdc_peripheral_slot {
     struct bt_conn* conn;
-    struct bt_gatt_discover_params discover_params;
-    struct bt_gatt_subscribe_params subscribe_params;
-    uint16_t asdc_char_handle;
+    struct bt_l2cap_le_chan chan;
 };
 
 static struct asdc_peripheral_slot peripheral_slots[CONFIG_ZMK_SPLIT_BLE_CENTRAL_PERIPHERALS];
 
-static const struct bt_uuid_128 asdc_char_uuid = BT_UUID_INIT_128(ZMK_BT_ASDC_CHAR_UUID);
-static const struct bt_uuid* descriptor_uuid = BT_UUID_GATT_CCC;
+NET_BUF_POOL_FIXED_DEFINE(asdc_central_tx_pool, 5, BT_L2CAP_SDU_BUF_SIZE(DATA_MTU), 8, NULL);
 
 static int asdc_peripheral_slot_index_for_conn(struct bt_conn *conn) {
     for (int i = 0; i < CONFIG_ZMK_SPLIT_BLE_CENTRAL_PERIPHERALS; i++) {
@@ -40,73 +39,40 @@ static struct asdc_peripheral_slot *asdc_peripheral_slot_for_conn(struct bt_conn
     return &peripheral_slots[idx];
 }
 
-static uint8_t asdc_central_notify_func(struct bt_conn *conn,
-                                        struct bt_gatt_subscribe_params *params,
-                                        const void *data, uint16_t length) {
-    if (!data) {
-		printk("asdc notification unsubscribed\n");
-		params->value_handle = 0U;
-		return BT_GATT_ITER_STOP;
-	}
-
-    asdc_on_data_received((uint8_t *)data, length);
-
-    return BT_GATT_ITER_CONTINUE;
-}
-
-static uint8_t asdc_central_descriptor_discovery_func(struct bt_conn *conn,
-                                                      const struct bt_gatt_attr *attr,
-                                                      struct bt_gatt_discover_params *params) {
-    struct asdc_peripheral_slot *slot = asdc_peripheral_slot_for_conn(conn);
-    if (slot == NULL) {
-        LOG_ERR("No asdc peripheral slot found for connection");
-        return BT_GATT_ITER_STOP;
-    }
-
-    // found the descriptor handle, now subscribe to notifications
-    slot->subscribe_params.notify = asdc_central_notify_func;
-    slot->subscribe_params.value = BT_GATT_CCC_NOTIFY;
-    slot->subscribe_params.ccc_handle = attr->handle;
-
-    int err = bt_gatt_subscribe(conn, &slot->subscribe_params);
-    if (err && err != -EALREADY) {
-        LOG_ERR("asdc subscribe failed (err %d)", err);
-    } else {
-        LOG_DBG("asdc subscribed");
+static int asdc_l2cap_recv(struct bt_l2cap_chan *chan, struct net_buf *buf) {
+    LOG_DBG("Central L2CAP received %d bytes", buf->len);
+    
+    if (buf->len > 0) {
+        asdc_on_data_received(buf->data, buf->len);
     }
     
-    return BT_GATT_ITER_STOP;
+    return 0;
 }
 
-static uint8_t asdc_central_char_discovery_func(struct bt_conn *conn,
-                                                const struct bt_gatt_attr *attr,
-                                                struct bt_gatt_discover_params *params) {
-    struct asdc_peripheral_slot *slot = asdc_peripheral_slot_for_conn(conn);
-    if (slot == NULL) {
-        LOG_ERR("No asdc peripheral slot found for connection");
-        return BT_GATT_ITER_STOP;
-    }
-
-    slot->asdc_char_handle = bt_gatt_attr_value_handle(attr);
-    LOG_DBG("asdc char value handle %u", slot->asdc_char_handle);
-
-    // start discovery
-    slot->discover_params.uuid = descriptor_uuid;
-    slot->discover_params.func = asdc_central_descriptor_discovery_func;
-    slot->discover_params.start_handle = attr->handle + 2;
-    slot->discover_params.end_handle = BT_ATT_LAST_ATTRIBUTE_HANDLE;
-    slot->discover_params.type = BT_GATT_DISCOVER_DESCRIPTOR;
-    slot->subscribe_params.value_handle = slot->asdc_char_handle;
-
-    LOG_DBG("starting asdc descriptor discovery");
-    int err = bt_gatt_discover(conn, &slot->discover_params);
-    if (err) {
-        LOG_ERR("asdc char discovery failed (err %d)", err);
-        return BT_GATT_ITER_STOP;
-    }
-
-    return BT_GATT_ITER_STOP;
+static void asdc_l2cap_connected(struct bt_l2cap_chan *chan) {
+    struct bt_l2cap_le_chan *le_chan = BT_L2CAP_LE_CHAN(chan);
+    struct bt_conn *conn = chan->conn;
+    
+    char addr[BT_ADDR_LE_STR_LEN];
+    bt_addr_le_to_str(bt_conn_get_dst(conn), addr, sizeof(addr));
+    
+    LOG_DBG("L2CAP channel connected: %s, TX MTU %d, RX MTU %d", 
+            addr, le_chan->tx.mtu, le_chan->rx.mtu);
 }
+
+static void asdc_l2cap_disconnected(struct bt_l2cap_chan *chan) {
+    struct bt_conn *conn = chan->conn;
+    
+    char addr[BT_ADDR_LE_STR_LEN];
+    bt_addr_le_to_str(bt_conn_get_dst(conn), addr, sizeof(addr));
+    LOG_DBG("L2CAP channel disconnected: %s", addr);
+}
+
+static struct bt_l2cap_chan_ops asdc_l2cap_ops = {
+    .connected = asdc_l2cap_connected,
+    .disconnected = asdc_l2cap_disconnected,
+    .recv = asdc_l2cap_recv,
+};
 
 //
 // Bluetooth connection callbacks
@@ -140,18 +106,13 @@ static void on_connected(struct bt_conn *conn, uint8_t err)
 
     // Store connection in all ASDC device instances
     asdc_store_connection(conn);
-
-    // start discovery
-    peripheral_slots[i].discover_params.uuid = &asdc_char_uuid.uuid;
-    peripheral_slots[i].discover_params.func = asdc_central_char_discovery_func;
-    peripheral_slots[i].discover_params.start_handle = BT_ATT_FIRST_ATTRIBUTE_HANDLE;
-    peripheral_slots[i].discover_params.end_handle = BT_ATT_LAST_ATTRIBUTE_HANDLE;
-    peripheral_slots[i].discover_params.type = BT_GATT_DISCOVER_CHARACTERISTIC;
-
-    LOG_DBG("starting asdc char discovery");
-    int discover_err = bt_gatt_discover(conn, &peripheral_slots[i].discover_params);
-    if (discover_err) {
-        LOG_ERR("asdc char discovery failed (err %d)", discover_err);
+    
+    // Connect L2CAP channel
+    struct bt_l2cap_le_chan *le_chan = &peripheral_slots[i].chan;
+    LOG_DBG("Connecting L2CAP channel to PSM 0x%04x", ZMK_BT_ASDC_L2CAP_PSM);
+    int l2cap_err = bt_l2cap_chan_connect(conn, &le_chan->chan, ZMK_BT_ASDC_L2CAP_PSM);
+    if (l2cap_err) {
+        LOG_ERR("Failed to connect L2CAP channel (err %d)", l2cap_err);
         return;
     }
 }
@@ -166,7 +127,6 @@ static void on_disconnected(struct bt_conn *conn, uint8_t reason)
     for (int i = 0; i < CONFIG_ZMK_SPLIT_BLE_CENTRAL_PERIPHERALS; i++) {
         if (peripheral_slots[i].conn == conn) {
             peripheral_slots[i].conn = NULL;
-            peripheral_slots[i].asdc_char_handle = 0;
             break;
         }
     }
@@ -185,10 +145,16 @@ BT_CONN_CB_DEFINE(conn_callbacks) = {
 //
 
 int asdc_transport_init(const struct device *dev) {
+
+    for (uint8_t i = 0; i < CONFIG_ZMK_SPLIT_BLE_CENTRAL_PERIPHERALS; i++) {
+        peripheral_slots[i].chan.chan.ops = &asdc_l2cap_ops;
+        peripheral_slots[i].chan.rx.mtu = DATA_MTU;
+        peripheral_slots[i].chan.tx.mtu = DATA_MTU;
+    }
     return 0;
 }
 
-void asdc_transport_send_data(const struct device *dev, const uint8_t *data, size_t len) {
+void asdc_transport_send_data(const struct device *dev, const uint8_t *data, size_t length) {
     struct asdc_data *asdc_data = (struct asdc_data *)dev->data;
     struct bt_conn* conn = asdc_data->conn;
     if (!conn) {
@@ -196,21 +162,50 @@ void asdc_transport_send_data(const struct device *dev, const uint8_t *data, siz
         return;
     }
 
+    // TODO - I think this needs to send for every peripheral slot?
+
     struct asdc_peripheral_slot *slot = asdc_peripheral_slot_for_conn(conn);
     if (!slot) {
         LOG_ERR("No peripheral slot found for connection");
         return;
     }
 
-    if (slot->asdc_char_handle == 0) {
-        LOG_ERR("ASDC characteristic handle not discovered yet");
+    if (!slot->chan.chan.conn) {
+        LOG_ERR("No active L2CAP channel for ASDC data send");
         return;
     }
 
-    int err = bt_gatt_write_without_response(conn, slot->asdc_char_handle, data, len, true);
-    if (err) {
-        LOG_ERR("Failed to write asdc characteristic (err %d)", err);
+    if (length > DATA_MTU) {
+        LOG_ERR("Length %zu exceeds configured MTU %d", length, DATA_MTU);
+        return;
+    }
+    
+    if (length > slot->chan.tx.mtu) {
+        LOG_ERR("Length %zu exceeds negotiated TX MTU %d", length, slot->chan.tx.mtu);
+        return;
+    }
+
+    struct net_buf *buf = net_buf_alloc(&asdc_central_tx_pool, K_SECONDS(2));
+    if (!buf) {
+        LOG_ERR("Failed to allocate net_buf for L2CAP send");
+        return;
+    }
+
+    net_buf_reserve(buf, BT_L2CAP_SDU_CHAN_SEND_RESERVE);
+    
+    if (length > net_buf_tailroom(buf)) {
+        LOG_ERR("Data too large for buffer (%zu > %d)", length, net_buf_tailroom(buf));
+        net_buf_unref(buf);
+        return;
+    }
+    
+    net_buf_add_mem(buf, data, length);
+
+    int err = bt_l2cap_chan_send(&slot->chan.chan, buf);
+    if (err < 0) {
+        LOG_ERR("Failed to send L2CAP data (err %d)", err);
+        net_buf_unref(buf);
     } else {
-        LOG_DBG("Successfully wrote %d bytes to asdc characteristic handle %d", len, slot->asdc_char_handle);
+        LOG_DBG("Successfully sent %zu bytes via L2CAP", length);
     }
 }
