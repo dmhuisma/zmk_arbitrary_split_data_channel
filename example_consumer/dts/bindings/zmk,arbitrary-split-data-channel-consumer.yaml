@@ -1,0 +1,11 @@
+
+description: |
+  Allows defining arbitrary split data channel consumer
+
+compatible: "zmk,arbitrary-split-data-channel-consumer"
+
+properties:
+  asdc-channels:
+    type: phandles
+    required: true
+    description: The asdc channel to use.

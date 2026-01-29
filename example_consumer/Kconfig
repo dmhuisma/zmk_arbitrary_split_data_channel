@@ -1,0 +1,9 @@
+
+DT_COMPAT_ZMK_ARBITRARY_SPLIT_DATA_CHANNEL_CONSUMER := zmk,arbitrary-split-data-channel-consumer
+config ZMK_ARBITRARY_SPLIT_DATA_CHANNEL_CONSUMER
+		bool
+		default $(dt_compat_enabled,$(DT_COMPAT_ZMK_ARBITRARY_SPLIT_DATA_CHANNEL_CONSUMER))
+
+config ZMK_ASDC_MAX_CHANNELS
+    int "The maximum number of arbitrary split data channels supported by one consumer"
+    default 2

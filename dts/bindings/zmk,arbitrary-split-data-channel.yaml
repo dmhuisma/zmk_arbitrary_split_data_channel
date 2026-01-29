@@ -1,0 +1,11 @@
+
+description: |
+  Allows defining arbitrary split data channel
+
+compatible: "zmk,arbitrary-split-data-channel"
+
+properties:
+  channel-id:
+    type: int
+    required: true
+    description: the id of this data channel, an integer.
