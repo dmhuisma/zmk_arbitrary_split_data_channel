@@ -34,7 +34,7 @@ K_MSGQ_DEFINE(asdc_rx_msgq, sizeof(struct asdc_event),
 void asdc_tx_work_callback(struct k_work *work) {
     struct asdc_event ev;
     while (k_msgq_get(&asdc_tx_msgq, &ev, K_NO_WAIT) == 0) {
-        LOG_DBG("Sending data: %u bytes", ev.len);
+        LOG_DBG("Sending asdc data: %u bytes", ev.len);
         asdc_transport_send_data(ev.dev, ev.data, ev.len);
         free(ev.data);
     }
@@ -43,8 +43,6 @@ void asdc_tx_work_callback(struct k_work *work) {
 void asdc_rx_work_callback(struct k_work *work) {
     struct asdc_event ev;
     while (k_msgq_get(&asdc_rx_msgq, &ev, K_NO_WAIT) == 0) {
-        LOG_DBG("Receiving data: %u bytes", ev.len);
-
         const struct device *dev = ev.dev;
         if (!dev) {
             LOG_ERR("No device for receiving data");
@@ -152,16 +150,11 @@ void asdc_on_data_received(uint8_t *data, size_t len)
 
     struct asdc_packet *packet = (struct asdc_packet *)data;
     
-    LOG_DBG("Packet header: channel_id=%u, len=%u", packet->channel_id, packet->len);
-    LOG_DBG("Expected total size: %u + %zu + %zu = %u", 
-            packet->len, sizeof(packet->channel_id), sizeof(packet->len),
-            packet->len + sizeof(packet->channel_id) + sizeof(packet->len));
+    LOG_DBG("asdc packet contains %u bytes of data on channel_id=%u", packet->len, packet->channel_id);
 
     if (packet->len + sizeof(packet->channel_id) + sizeof(packet->len) != len) {
         LOG_ERR("Received asdc data length mismatch, got %zu, expected %u",
                 len, packet->len + sizeof(packet->channel_id) + sizeof(packet->len));
-        // Dump first 16 bytes for debugging
-        LOG_HEXDUMP_ERR(data, MIN(len, 16), "Packet dump:");
         return;
     }
 

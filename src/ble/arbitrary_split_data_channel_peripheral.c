@@ -34,13 +34,10 @@ NET_BUF_POOL_FIXED_DEFINE(asdc_peripheral_tx_pool, 5, BT_L2CAP_SDU_BUF_SIZE(CONF
 // L2CAP Channel Callbacks
 //
 
-static int asdc_l2cap_recv(struct bt_l2cap_chan *chan, struct net_buf *buf) {
-    LOG_DBG("Peripheral L2CAP received %d bytes", buf->len);
-    
+static int asdc_l2cap_recv(struct bt_l2cap_chan *chan, struct net_buf *buf) {    
     if (buf->len > 0) {
         asdc_on_data_received(buf->data, buf->len);
     }
-    
     return 0;
 }
 
@@ -124,7 +121,7 @@ ZMK_SUBSCRIPTION(asdc_split_peripheral, zmk_split_peripheral_status_changed);
 
 int asdc_transport_init(const struct device *dev) {
     // Register L2CAP server
-    asdc_l2cap_server.psm = ZMK_BT_ASDC_L2CAP_PSM;
+    asdc_l2cap_server.psm = CONFIG_ZMK_BT_ASDC_L2CAP_PSM;
     asdc_l2cap_server.accept = asdc_l2cap_accept;
     asdc_l2cap_server.sec_level = BT_SECURITY_L1;
 
@@ -134,7 +131,7 @@ int asdc_transport_init(const struct device *dev) {
         return err;
     }
     
-    LOG_DBG("L2CAP server registered on PSM 0x%04x", ZMK_BT_ASDC_L2CAP_PSM);
+    LOG_DBG("L2CAP server registered on PSM 0x%04x", CONFIG_ZMK_BT_ASDC_L2CAP_PSM);
     return 0;
 }
 
@@ -181,7 +178,5 @@ void asdc_transport_send_data(const struct device *dev, const uint8_t *data, siz
     if (err < 0) {
         LOG_ERR("Failed to send L2CAP data (err %d)", err);
         net_buf_unref(buf);
-    } else {
-        LOG_DBG("Successfully sent %zu bytes via L2CAP", length);
     }
 }

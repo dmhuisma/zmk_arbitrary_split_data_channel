@@ -2,13 +2,6 @@
 #ifndef ZMK_ARBITRARY_SPLIT_DATA_CHANNEL_H_
 #define ZMK_ARBITRARY_SPLIT_DATA_CHANNEL_H_
 
-#ifdef CONFIG_ZMK_SPLIT_BLE
-#include <zephyr/bluetooth/uuid.h>
-// L2CAP PSM (Protocol/Service Multiplexer) for ASDC
-// Using a dynamic PSM in the range 0x0080-0x00FF
-#define ZMK_BT_ASDC_L2CAP_PSM           0x0080
-#endif
-
 #include <zephyr/device.h>
 #include <zephyr/kernel.h>
 

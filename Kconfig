@@ -1,8 +1,8 @@
 
 DT_COMPAT_ZMK_ARBITRARY_SPLIT_DATA_CHANNEL := zmk,arbitrary-split-data-channel
 config ZMK_ARBITRARY_SPLIT_DATA_CHANNEL
-		bool
-		default $(dt_compat_enabled,$(DT_COMPAT_ZMK_ARBITRARY_SPLIT_DATA_CHANNEL))
+    bool
+    default $(dt_compat_enabled,$(DT_COMPAT_ZMK_ARBITRARY_SPLIT_DATA_CHANNEL))
 
 config ZMK_ARBITRARY_SPLIT_DATA_CHANNEL_TX_QUEUE_SIZE
     int "Max number of data events to queue when sending"
@@ -11,3 +11,7 @@ config ZMK_ARBITRARY_SPLIT_DATA_CHANNEL_TX_QUEUE_SIZE
 config ZMK_ARBITRARY_SPLIT_DATA_CHANNEL_RX_QUEUE_SIZE
     int "Max number of data events to queue when receiving"
     default 5
+
+config ZMK_BT_ASDC_L2CAP_PSM
+    hex "L2CAP PSM for Arbitrary Split Data Channel"
+    default 0x0080

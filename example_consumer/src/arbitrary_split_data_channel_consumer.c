@@ -52,7 +52,7 @@ static void hello_timer_handler(struct k_work *work)
     }
 
     // Reschedule for next second
-    k_work_schedule(&data->hello_timer, K_SECONDS(5));
+    k_work_schedule(&data->hello_timer, K_SECONDS(10));
 }
 
 static int asdcc_init(const struct device *dev)
@@ -79,7 +79,7 @@ static int asdcc_init(const struct device *dev)
     k_work_init_delayable(&data->hello_timer, hello_timer_handler);
     
     // Start the timer to send "hello" every second
-    k_work_schedule(&data->hello_timer, K_SECONDS(5));
+    k_work_schedule(&data->hello_timer, K_SECONDS(10));
 
     return 0;
 }

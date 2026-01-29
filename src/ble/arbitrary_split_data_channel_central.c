@@ -36,13 +36,10 @@ static struct asdc_peripheral_slot *asdc_peripheral_slot_for_conn(struct bt_conn
     return &peripheral_slots[idx];
 }
 
-static int asdc_l2cap_recv(struct bt_l2cap_chan *chan, struct net_buf *buf) {
-    LOG_DBG("Central L2CAP received %d bytes", buf->len);
-    
+static int asdc_l2cap_recv(struct bt_l2cap_chan *chan, struct net_buf *buf) {    
     if (buf->len > 0) {
         asdc_on_data_received(buf->data, buf->len);
     }
-    
     return 0;
 }
 
@@ -106,8 +103,8 @@ static void on_connected(struct bt_conn *conn, uint8_t err)
     
     // Connect L2CAP channel
     struct bt_l2cap_le_chan *le_chan = &peripheral_slots[i].chan;
-    LOG_DBG("Connecting L2CAP channel to PSM 0x%04x", ZMK_BT_ASDC_L2CAP_PSM);
-    int l2cap_err = bt_l2cap_chan_connect(conn, &le_chan->chan, ZMK_BT_ASDC_L2CAP_PSM);
+    LOG_DBG("Connecting L2CAP channel to PSM 0x%04x", CONFIG_ZMK_BT_ASDC_L2CAP_PSM);
+    int l2cap_err = bt_l2cap_chan_connect(conn, &le_chan->chan, CONFIG_ZMK_BT_ASDC_L2CAP_PSM);
     if (l2cap_err) {
         LOG_ERR("Failed to connect L2CAP channel (err %d)", l2cap_err);
         return;
@@ -201,7 +198,5 @@ void asdc_transport_send_data(const struct device *dev, const uint8_t *data, siz
     if (err < 0) {
         LOG_ERR("Failed to send L2CAP data (err %d)", err);
         net_buf_unref(buf);
-    } else {
-        LOG_DBG("Successfully sent %zu bytes via L2CAP", length);
     }
 }
