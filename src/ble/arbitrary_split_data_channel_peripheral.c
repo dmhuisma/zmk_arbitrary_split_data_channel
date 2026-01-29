@@ -11,9 +11,6 @@
 
 LOG_MODULE_DECLARE(zmk, CONFIG_ZMK_LOG_LEVEL);
 
-#define CREDITS			10
-#define DATA_MTU		(23 * CREDITS)
-
 static void asdc_l2cap_connected(struct bt_l2cap_chan *chan);
 static void asdc_l2cap_disconnected(struct bt_l2cap_chan *chan);
 static int asdc_l2cap_recv(struct bt_l2cap_chan *chan, struct net_buf *buf);
@@ -28,11 +25,10 @@ static struct bt_l2cap_chan_ops asdc_l2cap_ops = {
 
 static struct bt_l2cap_le_chan asdc_l2cap_chan = {
 	.chan.ops = &asdc_l2cap_ops,
-	.rx.mtu = DATA_MTU,
-    .tx.mtu = DATA_MTU,
+	.rx.mtu = CONFIG_BT_L2CAP_TX_MTU,
 };
 
-NET_BUF_POOL_FIXED_DEFINE(asdc_peripheral_tx_pool, 5, BT_L2CAP_SDU_BUF_SIZE(DATA_MTU), 8, NULL);
+NET_BUF_POOL_FIXED_DEFINE(asdc_peripheral_tx_pool, 5, BT_L2CAP_SDU_BUF_SIZE(CONFIG_BT_L2CAP_TX_MTU), 8, NULL);
 
 //
 // L2CAP Channel Callbacks
@@ -155,8 +151,8 @@ void asdc_transport_send_data(const struct device *dev, const uint8_t *data, siz
         return;
     }
 
-    if (length > DATA_MTU) {
-        LOG_ERR("Length %zu exceeds configured MTU %d", length, DATA_MTU);
+    if (length > CONFIG_BT_L2CAP_TX_MTU) {
+        LOG_ERR("Length %zu exceeds configured MTU %d", length, CONFIG_BT_L2CAP_TX_MTU);
         return;
     }
     

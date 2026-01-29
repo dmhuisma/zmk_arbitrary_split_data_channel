@@ -10,9 +10,6 @@
 
 LOG_MODULE_DECLARE(zmk, CONFIG_ZMK_LOG_LEVEL);
 
-#define CREDITS			10
-#define DATA_MTU		(23 * CREDITS)
-
 struct asdc_peripheral_slot {
     struct bt_conn* conn;
     struct bt_l2cap_le_chan chan;
@@ -20,7 +17,7 @@ struct asdc_peripheral_slot {
 
 static struct asdc_peripheral_slot peripheral_slots[CONFIG_ZMK_SPLIT_BLE_CENTRAL_PERIPHERALS];
 
-NET_BUF_POOL_FIXED_DEFINE(asdc_central_tx_pool, 5, BT_L2CAP_SDU_BUF_SIZE(DATA_MTU), 8, NULL);
+NET_BUF_POOL_FIXED_DEFINE(asdc_central_tx_pool, 5, BT_L2CAP_SDU_BUF_SIZE(CONFIG_BT_L2CAP_TX_MTU), 8, NULL);
 
 static int asdc_peripheral_slot_index_for_conn(struct bt_conn *conn) {
     for (int i = 0; i < CONFIG_ZMK_SPLIT_BLE_CENTRAL_PERIPHERALS; i++) {
@@ -148,8 +145,7 @@ int asdc_transport_init(const struct device *dev) {
 
     for (uint8_t i = 0; i < CONFIG_ZMK_SPLIT_BLE_CENTRAL_PERIPHERALS; i++) {
         peripheral_slots[i].chan.chan.ops = &asdc_l2cap_ops;
-        peripheral_slots[i].chan.rx.mtu = DATA_MTU;
-        peripheral_slots[i].chan.tx.mtu = DATA_MTU;
+        peripheral_slots[i].chan.rx.mtu = CONFIG_BT_L2CAP_TX_MTU;
     }
     return 0;
 }
@@ -175,8 +171,8 @@ void asdc_transport_send_data(const struct device *dev, const uint8_t *data, siz
         return;
     }
 
-    if (length > DATA_MTU) {
-        LOG_ERR("Length %zu exceeds configured MTU %d", length, DATA_MTU);
+    if (length > CONFIG_BT_L2CAP_TX_MTU) {
+        LOG_ERR("Length %zu exceeds configured MTU %d", length, CONFIG_BT_L2CAP_TX_MTU);
         return;
     }
     

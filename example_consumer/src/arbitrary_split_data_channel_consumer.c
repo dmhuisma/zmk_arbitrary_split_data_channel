@@ -39,7 +39,13 @@ static void hello_timer_handler(struct k_work *work)
     const struct asdc_consumer_config *config = (const struct asdc_consumer_config *)data->dev->config;
 
     // Send "hello" to all ASDC channels
-    uint8_t message[] = "Hello! This is an example of a large message more than the BLE MTU size.";
+    uint8_t message[] = "This is a 400-byte test message for L2CAP transmission testing. "
+                        "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789abcdefghijklmnopqrstuvwxyz "
+                        "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789abcdefghijklmnopqrstuvwxyz "
+                        "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789abcdefghijklmnopqrstuvwxyz "
+                        "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789abcdefghijklmnopqrstuvwxyz "
+                        "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789abcdefghijklmnopqrstuvwxyz "
+                        "END_OF_MESSAGE";
     for (size_t i = 0; i < config->num_channels; i++) {
         const struct device *asdc_dev = config->asdc_channels[i];
         send_asdc_message(asdc_dev, message, sizeof(message));
