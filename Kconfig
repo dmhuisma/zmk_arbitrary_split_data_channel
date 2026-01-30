@@ -15,3 +15,7 @@ config ZMK_ARBITRARY_SPLIT_DATA_CHANNEL_RX_QUEUE_SIZE
 config ZMK_BT_ASDC_L2CAP_PSM
     hex "L2CAP PSM for Arbitrary Split Data Channel"
     default 0x0080
+
+config BT_L2CAP_DYNAMIC_CHANNEL
+    bool
+    default y
