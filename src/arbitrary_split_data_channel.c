@@ -101,7 +101,12 @@ static int asdc_send_data(const struct device *dev, const uint8_t *data, size_t 
         .len = sizeof(struct asdc_packet) + len,
         .data = (uint8_t *)packet,
     };
-    k_msgq_put(&asdc_tx_msgq, &ev, K_NO_WAIT);
+    int ret =k_msgq_put(&asdc_tx_msgq, &ev, K_NO_WAIT);
+    if (ret < 0) {
+        free(packet);
+        LOG_ERR("Failed to queue asdc data for sending on device %s: %d", dev->name, ret);
+        return ret;
+    }
     
     if (delay_ms > 0) {
         k_work_schedule(&asdc_tx_work, K_MSEC(delay_ms));
@@ -114,7 +119,7 @@ static int asdc_send_data(const struct device *dev, const uint8_t *data, size_t 
 
 void asdc_on_data_received(uint8_t *data, size_t len)
 {
-    LOG_DBG("asdc_on_data_received: received %zu bytes", len);
+    LOG_DBG("asdc received %zu bytes", len);
     
     if (len < sizeof(struct asdc_packet)) {
         LOG_ERR("Received data too small to contain asdc_packet header (need %zu, got %zu)", 
@@ -156,7 +161,12 @@ void asdc_on_data_received(uint8_t *data, size_t len)
         .len = packet->len,
         .data = data_copy,
     };
-    k_msgq_put(&asdc_rx_msgq, &ev, K_NO_WAIT);
+    int ret = k_msgq_put(&asdc_rx_msgq, &ev, K_NO_WAIT);
+    if (ret < 0) {
+        free(data_copy);
+        LOG_ERR("Failed to queue received asdc data on device %s: %d", dev->name, ret);
+        return;
+    }
     k_work_submit(&asdc_rx_work);
 }
 
