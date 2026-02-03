@@ -12,7 +12,7 @@
 
 LOG_MODULE_DECLARE(zmk, CONFIG_ZMK_LOG_LEVEL);
 
-static void asdc_rx_callback(const struct device *dev, uint8_t *data, size_t len) {
+static void asdc_rx_callback(const struct device *dev, void* sender_conn, uint8_t *data, size_t len) {
     LOG_INF("ASDC data received on device %s: len=%d", dev->name, len);
     
     // Print data as string in chunks

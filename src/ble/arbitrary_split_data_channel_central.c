@@ -21,7 +21,7 @@ NET_BUF_POOL_FIXED_DEFINE(asdc_central_tx_pool, 5, BT_L2CAP_SDU_BUF_SIZE(CONFIG_
 
 static int asdc_l2cap_recv(struct bt_l2cap_chan *chan, struct net_buf *buf) {    
     if (buf->len > 0) {
-        asdc_on_data_received(buf->data, buf->len);
+        asdc_on_data_received(chan->conn, buf->data, buf->len);
     }
     return 0;
 }

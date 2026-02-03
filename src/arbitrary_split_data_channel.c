@@ -17,8 +17,15 @@
 
 LOG_MODULE_DECLARE(zmk, CONFIG_ZMK_LOG_LEVEL);
 
-struct asdc_event {
+struct asdc_tx_event {
     const struct device *dev;
+    size_t len;
+    uint8_t *data;
+};
+
+struct asdc_rx_event {
+    const struct device *dev;
+    void* conn;                     // this is void* in order to match the split transport connection type used (BLE, wired, etc...).
     size_t len;
     uint8_t *data;
 };
@@ -26,13 +33,13 @@ struct asdc_event {
 int asdc_transport_init(const struct device *dev);
 void asdc_transport_send_data(const struct device *dev, const uint8_t *data, size_t len);
 
-K_MSGQ_DEFINE(asdc_tx_msgq, sizeof(struct asdc_event),
+K_MSGQ_DEFINE(asdc_tx_msgq, sizeof(struct asdc_tx_event),
               CONFIG_ZMK_ARBITRARY_SPLIT_DATA_CHANNEL_TX_QUEUE_SIZE, 1);
-K_MSGQ_DEFINE(asdc_rx_msgq, sizeof(struct asdc_event),
+K_MSGQ_DEFINE(asdc_rx_msgq, sizeof(struct asdc_rx_event),
               CONFIG_ZMK_ARBITRARY_SPLIT_DATA_CHANNEL_RX_QUEUE_SIZE, 1);
 
 void asdc_tx_work_callback(struct k_work *work) {
-    struct asdc_event ev;
+    struct asdc_tx_event ev;
     while (k_msgq_get(&asdc_tx_msgq, &ev, K_NO_WAIT) == 0) {
         LOG_DBG("Sending asdc data: %u bytes", ev.len);
         asdc_transport_send_data(ev.dev, ev.data, ev.len);
@@ -41,7 +48,7 @@ void asdc_tx_work_callback(struct k_work *work) {
 }
 
 void asdc_rx_work_callback(struct k_work *work) {
-    struct asdc_event ev;
+    struct asdc_rx_event ev;
     while (k_msgq_get(&asdc_rx_msgq, &ev, K_NO_WAIT) == 0) {
         const struct device *dev = ev.dev;
         if (!dev) {
@@ -54,7 +61,7 @@ void asdc_rx_work_callback(struct k_work *work) {
             LOG_WRN("No recv callback assigned on device %s", dev->name);
             continue;
         }
-        asdc_data->recv_cb(dev, ev.data, ev.len);
+        asdc_data->recv_cb(dev, ev.conn, ev.data, ev.len);
         free(ev.data);
     }
 }
@@ -96,7 +103,7 @@ static int asdc_send_data(const struct device *dev, const uint8_t *data, size_t 
     packet->len = len;
     packet->channel_id = ((const struct asdc_config *)dev->config)->channel_id;
 
-    struct asdc_event ev = {
+    struct asdc_tx_event ev = {
         .dev = dev,
         .len = sizeof(struct asdc_packet) + len,
         .data = (uint8_t *)packet,
@@ -117,7 +124,7 @@ static int asdc_send_data(const struct device *dev, const uint8_t *data, size_t 
     return len;
 }
 
-void asdc_on_data_received(uint8_t *data, size_t len)
+void asdc_on_data_received(void* conn, uint8_t *data, size_t len)
 {
     LOG_DBG("asdc received %zu bytes", len);
     
@@ -156,10 +163,11 @@ void asdc_on_data_received(uint8_t *data, size_t len)
     }
     memcpy(data_copy, packet->data, packet->len);
 
-    struct asdc_event ev = {
+    struct asdc_rx_event ev = {
         .dev = dev,
         .len = packet->len,
         .data = data_copy,
+        .conn = conn,
     };
     int ret = k_msgq_put(&asdc_rx_msgq, &ev, K_NO_WAIT);
     if (ret < 0) {

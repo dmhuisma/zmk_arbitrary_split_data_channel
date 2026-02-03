@@ -10,7 +10,8 @@ struct asdc_config {
     int channel_id;
 };
 
-typedef void (*asdc_rx_cb)(const struct device *dev, uint8_t *buf, size_t buflen);
+// sender_conn can be used for identification of the connection the data came from
+typedef void (*asdc_rx_cb)(const struct device *dev, void* sender_conn, uint8_t *buf, size_t buflen);
 
 typedef int (*asdc_tx)(const struct device *dev, const uint8_t *data, size_t len, uint32_t delay_ms);
 typedef void (*asdc_register_rx_cb)(const struct device *dev, asdc_rx_cb cb);
@@ -53,7 +54,7 @@ static inline void z_impl_asdc_register_recv_cb(const struct device *dev, asdc_r
 	api->register_recv_cb(dev, cb);
 }
 
-void asdc_on_data_received(uint8_t *data, size_t len);
+void asdc_on_data_received(void* conn, uint8_t *data, size_t len);
 
 #include <syscalls/arbitrary_split_data_channel.h>
 
