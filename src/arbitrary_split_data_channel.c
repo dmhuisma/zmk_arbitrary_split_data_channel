@@ -64,7 +64,7 @@ static int asdc_init(const struct device *dev)
     return asdc_transport_init(dev);
 }
 
-K_WORK_DEFINE(asdc_tx_work, asdc_tx_work_callback);
+K_WORK_DELAYABLE_DEFINE(asdc_tx_work, asdc_tx_work_callback);
 K_WORK_DEFINE(asdc_rx_work, asdc_rx_work_callback);
 
 const struct device* find_dev_for_channel_id(int channel_id) {
@@ -84,7 +84,7 @@ const struct device* find_dev_for_channel_id(int channel_id) {
     return dev;
 }
 
-static int asdc_send_data(const struct device *dev, const uint8_t *data, size_t len)
+static int asdc_send_data(const struct device *dev, const uint8_t *data, size_t len, uint32_t delay_ms)
 {
     struct asdc_packet *packet = malloc(sizeof(struct asdc_packet) + len);
     if (!packet) {
@@ -102,7 +102,12 @@ static int asdc_send_data(const struct device *dev, const uint8_t *data, size_t 
         .data = (uint8_t *)packet,
     };
     k_msgq_put(&asdc_tx_msgq, &ev, K_NO_WAIT);
-    k_work_submit(&asdc_tx_work);
+    
+    if (delay_ms > 0) {
+        k_work_schedule(&asdc_tx_work, K_MSEC(delay_ms));
+    } else {
+        k_work_schedule(&asdc_tx_work, K_NO_WAIT);
+    }
 
     return len;
 }

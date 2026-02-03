@@ -12,7 +12,7 @@ struct asdc_config {
 
 typedef void (*asdc_rx_cb)(const struct device *dev, uint8_t *buf, size_t buflen);
 
-typedef int (*asdc_tx)(const struct device *dev, const uint8_t *data, size_t len);
+typedef int (*asdc_tx)(const struct device *dev, const uint8_t *data, size_t len, uint32_t delay_ms);
 typedef void (*asdc_register_rx_cb)(const struct device *dev, asdc_rx_cb cb);
 
 // device runtime data structure
@@ -31,15 +31,15 @@ __subsystem struct asdc_driver_api {
     asdc_register_rx_cb register_recv_cb;
 };
 
-__syscall int asdc_send(const struct device *dev, const uint8_t *data, size_t len);
+__syscall int asdc_send(const struct device *dev, const uint8_t *data, size_t len, uint32_t delay_ms);
 
-static inline int z_impl_asdc_send(const struct device *dev, const uint8_t *data, size_t len)
+static inline int z_impl_asdc_send(const struct device *dev, const uint8_t *data, size_t len, uint32_t delay_ms)
 {
     const struct asdc_driver_api *api = (const struct asdc_driver_api *)dev->api;
 	if (api->send == NULL) {
 		return -ENOSYS;
 	}
-	return api->send(dev, data, len);
+	return api->send(dev, data, len, delay_ms);
 }
 
 __syscall void asdc_register_recv_cb(const struct device *dev, asdc_rx_cb cb);

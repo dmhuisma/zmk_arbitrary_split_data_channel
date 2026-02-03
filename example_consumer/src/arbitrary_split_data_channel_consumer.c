@@ -32,7 +32,7 @@ static void asdc_rx_callback(const struct device *dev, uint8_t *data, size_t len
 
 static void send_asdc_message(const struct device *asdc_dev, uint8_t* data, size_t length)
 {
-    int ret = asdc_send(asdc_dev, data, length);
+    int ret = asdc_send(asdc_dev, data, length, 0);
     if (ret < 0) {
         LOG_ERR("Failed to send ASDC message on device %s: %d", asdc_dev->name, ret);
     } else {
