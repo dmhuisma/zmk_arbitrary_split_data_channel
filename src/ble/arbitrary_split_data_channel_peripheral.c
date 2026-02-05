@@ -28,7 +28,10 @@ static struct bt_l2cap_le_chan asdc_l2cap_chan = {
 	.rx.mtu = CONFIG_BT_L2CAP_TX_MTU,
 };
 
-NET_BUF_POOL_FIXED_DEFINE(asdc_peripheral_tx_pool, 5, BT_L2CAP_SDU_BUF_SIZE(CONFIG_BT_L2CAP_TX_MTU), 8, NULL);
+// match the CONFIG_ZMK_ARBITRARY_SPLIT_DATA_CHANNEL_TX_QUEUE_SIZE here
+NET_BUF_POOL_FIXED_DEFINE(asdc_peripheral_tx_pool, 
+                          CONFIG_ZMK_ARBITRARY_SPLIT_DATA_CHANNEL_TX_QUEUE_SIZE, 
+                          BT_L2CAP_SDU_BUF_SIZE(CONFIG_BT_L2CAP_TX_MTU), 8, NULL);
 
 //
 // L2CAP Channel Callbacks

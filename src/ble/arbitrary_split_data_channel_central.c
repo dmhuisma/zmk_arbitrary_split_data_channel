@@ -17,7 +17,10 @@ struct asdc_peripheral_slot {
 
 static struct asdc_peripheral_slot peripheral_slots[CONFIG_ZMK_SPLIT_BLE_CENTRAL_PERIPHERALS];
 
-NET_BUF_POOL_FIXED_DEFINE(asdc_central_tx_pool, 5, BT_L2CAP_SDU_BUF_SIZE(CONFIG_BT_L2CAP_TX_MTU), 8, NULL);
+// match the CONFIG_ZMK_ARBITRARY_SPLIT_DATA_CHANNEL_TX_QUEUE_SIZE here
+NET_BUF_POOL_FIXED_DEFINE(asdc_central_tx_pool, 
+                          CONFIG_ZMK_ARBITRARY_SPLIT_DATA_CHANNEL_TX_QUEUE_SIZE,
+                          BT_L2CAP_SDU_BUF_SIZE(CONFIG_BT_L2CAP_TX_MTU), 8, NULL);
 
 static int asdc_l2cap_recv(struct bt_l2cap_chan *chan, struct net_buf *buf) {    
     if (buf->len > 0) {

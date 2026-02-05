@@ -41,7 +41,6 @@ K_MSGQ_DEFINE(asdc_rx_msgq, sizeof(struct asdc_rx_event),
 void asdc_tx_work_callback(struct k_work *work) {
     struct asdc_tx_event ev;
     while (k_msgq_get(&asdc_tx_msgq, &ev, K_NO_WAIT) == 0) {
-        LOG_DBG("Sending asdc data: %u bytes", ev.len);
         asdc_transport_send_data(ev.dev, ev.data, ev.len);
         free(ev.data);
     }

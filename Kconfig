@@ -6,11 +6,11 @@ config ZMK_ARBITRARY_SPLIT_DATA_CHANNEL
 
 config ZMK_ARBITRARY_SPLIT_DATA_CHANNEL_TX_QUEUE_SIZE
     int "Max number of data events to queue when sending"
-    default 5
+    default 30
 
 config ZMK_ARBITRARY_SPLIT_DATA_CHANNEL_RX_QUEUE_SIZE
     int "Max number of data events to queue when receiving"
-    default 5
+    default 20
 
 config ZMK_BT_ASDC_L2CAP_PSM
     hex "L2CAP PSM for Arbitrary Split Data Channel"
