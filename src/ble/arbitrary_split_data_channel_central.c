@@ -61,11 +61,18 @@ static struct bt_l2cap_chan_ops asdc_l2cap_ops = {
 static void on_connected(struct bt_conn *conn, uint8_t err)
 {
     if (err) {
-		return;
-	}
+        return;
+    }
 
-	char addr[BT_ADDR_LE_STR_LEN];
-	bt_addr_le_to_str(bt_conn_get_dst(conn), addr, sizeof(addr));
+    // Only track connections where this device is the central (i.e. the split peripherals).
+    // Host connections (dongle acting as a peripheral) must not consume a slot.
+    struct bt_conn_info info;
+    if (bt_conn_get_info(conn, &info) || info.role != BT_CONN_ROLE_CENTRAL) {
+        return;
+    }
+
+    char addr[BT_ADDR_LE_STR_LEN];
+    bt_addr_le_to_str(bt_conn_get_dst(conn), addr, sizeof(addr));
     LOG_DBG("asdc connection callback: %s", addr);
 
     // Store the connection in the peripherals array
@@ -96,9 +103,9 @@ static void on_connected(struct bt_conn *conn, uint8_t err)
 
 static void on_disconnected(struct bt_conn *conn, uint8_t reason)
 {
-	char addr[BT_ADDR_LE_STR_LEN];
-	bt_addr_le_to_str(bt_conn_get_dst(conn), addr, sizeof(addr));
-	LOG_DBG("asdc disconnection callback: %s", addr);
+    char addr[BT_ADDR_LE_STR_LEN];
+    bt_addr_le_to_str(bt_conn_get_dst(conn), addr, sizeof(addr));
+    LOG_DBG("asdc disconnection callback: %s", addr);
 
     // Remove the connection from the peripherals array
     for (int i = 0; i < CONFIG_ZMK_SPLIT_BLE_CENTRAL_PERIPHERALS; i++) {
@@ -110,8 +117,8 @@ static void on_disconnected(struct bt_conn *conn, uint8_t reason)
 }
 
 BT_CONN_CB_DEFINE(conn_callbacks) = {
-	.connected = on_connected,
-	.disconnected = on_disconnected,
+    .connected = on_connected,
+    .disconnected = on_disconnected,
 };
 
 //
